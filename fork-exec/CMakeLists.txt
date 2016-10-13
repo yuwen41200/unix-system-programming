@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.6)
+project(fork_exec)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
+set(SRC_BASIC basic.c)
+set(SRC_SHARE share.c)
+add_executable(basic ${SRC_BASIC})
+add_executable(share ${SRC_SHARE})
