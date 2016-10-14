@@ -6,6 +6,9 @@
 #include <vector>
 
 int main() {
+	setenv("TERM", "xterm-256color", 0);
+	// prevent "WARNING: terminal is not fully functional"
+	// or "TERM environment variable not set" messages
 
 	while (1) {
 		std::cout << "> ";
@@ -32,7 +35,7 @@ int main() {
 			c_argument[it->size()] = '\0';
 			c_arguments[i++] = c_argument;
 		}
-		c_arguments[i++] = nullptr;
+		c_arguments[i++] = NULL;
 
 		if (blocking)
 			signal(SIGCHLD, SIG_DFL);
@@ -55,6 +58,8 @@ int main() {
 			if (blocking) {
 				int status;
 				waitpid(pid, &status, 0);
+				usleep(100);
+				// workaround for overlapped output
 				if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0))
 					std::cout << "shell: command execution failed: " << command << std::endl;
 			}
@@ -66,3 +71,7 @@ int main() {
 	}
 
 }
+
+// TODO:
+// http://stackoverflow.com/questions/17166721/pipe-implementation-in-linux-using-c
+// http://stackoverflow.com/questions/8082932/connecting-n-commands-with-pipes-in-a-shell
