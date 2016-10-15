@@ -44,15 +44,19 @@ int main() {
 
 		it_find = std::find(arguments.begin(), arguments.end(), "<");
 		if (it_find != arguments.end()) {
-			redirect_in = true;
-			redirect_in_path = *(it_find + 1);
+			if (it_find + 1 != arguments.end()) {
+				redirect_in = true;
+				redirect_in_path = *(it_find + 1);
+			}
 			arguments.erase(it_find, arguments.end());
 		}
 
 		it_find = std::find(arguments.begin(), arguments.end(), ">");
 		if (it_find != arguments.end()) {
-			redirect_out = true;
-			redirect_out_path = *(it_find + 1);
+			if (it_find + 1 != arguments.end()) {
+				redirect_out = true;
+				redirect_out_path = *(it_find + 1);
+			}
 			arguments.erase(it_find, arguments.end());
 		}
 
@@ -73,7 +77,7 @@ int main() {
 
 		// handle error
 		if (pid < 0) {
-			std::cerr << "fork() failed" << std::endl;
+			std::cerr << "shell: fork() failed" << std::endl;
 			return 1;
 		}
 
@@ -108,8 +112,10 @@ int main() {
 				pid_t pid_inner = fork();
 				if (pid_inner < 0)
 					_exit(1);
-				else if (pid_inner == 0)
+				else if (pid_inner == 0) {
 					execvp(c_arguments[0], c_arguments);
+					_exit(1);
+				}
 				else
 					_exit(0);
 			}
