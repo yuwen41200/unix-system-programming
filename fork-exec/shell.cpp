@@ -19,25 +19,33 @@ int main() {
 	setenv("TERM", "xterm-256color", 0);
 
 	while (1) {
+		// read command
 		std::cout << "> " << std::flush;
 		std::string command;
 		std::getline(std::cin, command);
 		std::istringstream ss(command);
 
+		// tokenize command
 		std::vector<std::string> arguments;
 		std::string argument;
 		while (ss >> argument)
 			arguments.push_back(argument);
 
+		// fundamental check
 		if (arguments.size() == 0)
 			continue;
 		if (arguments.front() == "exit")
 			return 0;
 
+		// check background execution (&)
 		bool blocking = arguments.back() != "&";
-		if (arguments.back() == "&")
+		if (arguments.back() == "&") {
 			arguments.pop_back();
+			if (arguments.size() == 0)
+				continue;
+		}
 
+		// check redirection (<, >)
 		bool redirect_in = false, redirect_out = false;
 		std::string redirect_in_path = "", redirect_out_path = "";
 		std::vector<std::string>::iterator it_find;
@@ -49,6 +57,8 @@ int main() {
 				redirect_in_path = *(it_find + 1);
 			}
 			arguments.erase(it_find, arguments.end());
+			if (arguments.size() == 0)
+				continue;
 		}
 
 		it_find = std::find(arguments.begin(), arguments.end(), ">");
@@ -58,15 +68,45 @@ int main() {
 				redirect_out_path = *(it_find + 1);
 			}
 			arguments.erase(it_find, arguments.end());
+			if (arguments.size() == 0)
+				continue;
 		}
 
+		// check pipe(|)
+		bool need_pipe = false;
+		int next_cmd_idx = -1, fpipe[2];
+
+		if (arguments.front() == "|") {
+			arguments.erase(arguments.begin());
+			if (arguments.size() == 0)
+				continue;
+		}
+
+		if (arguments.back() == "|") {
+			arguments.pop_back();
+			if (arguments.size() == 0)
+				continue;
+		}
+
+		if (std::find(arguments.begin(), arguments.end(), "|") != arguments.end()) {
+			pipe(fpipe);
+			need_pipe = true;
+		}
+
+		// convert C++ string vector to C char* array
 		char **c_arguments = new char*[arguments.size() + 1];
 		int arg_len = 0;
 		for (std::vector<std::string>::iterator it = arguments.begin(); it != arguments.end(); ++it) {
-			char *c_argument = new char[it->size() + 1];
-			std::copy(it->begin(), it->end(), c_argument);
-			c_argument[it->size()] = '\0';
-			c_arguments[arg_len++] = c_argument;
+			if (*it == "|") {
+				c_arguments[arg_len++] = NULL;
+				next_cmd_idx = arg_len;
+			}
+			else {
+				char *c_argument = new char[it->size() + 1];
+				std::copy(it->begin(), it->end(), c_argument);
+				c_argument[it->size()] = '\0';
+				c_arguments[arg_len++] = c_argument;
+			}
 		}
 		c_arguments[arg_len++] = NULL;
 
@@ -78,7 +118,7 @@ int main() {
 		// handle error
 		if (pid < 0) {
 			std::cerr << "shell: fork() failed" << std::endl;
-			return 1;
+			continue;
 		}
 
 		// child process
@@ -90,7 +130,14 @@ int main() {
 				close(fin);
 			}
 
-			if (redirect_out) {
+			if (need_pipe) {
+				// connect output of first command to fpipe[1]
+				dup2(fpipe[1], STDOUT_FILENO);
+				close(fpipe[0]);
+				close(fpipe[1]);
+			}
+
+			else if (redirect_out) {
 				// open or create output file in mode 644
 				int fout = open(
 					redirect_out_path.c_str(),
@@ -137,7 +184,3 @@ int main() {
 	}
 
 }
-
-// TODO:
-// http://stackoverflow.com/questions/17166721/pipe-implementation-in-linux-using-c
-// http://stackoverflow.com/questions/8082932/connecting-n-commands-with-pipes-in-a-shell
