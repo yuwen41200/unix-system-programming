@@ -14,9 +14,9 @@
 #include <vector>
 
 int main() {
-	setenv("TERM", "xterm-256color", 0);
 	// prevent "WARNING: terminal is not fully functional"
 	// or "TERM environment variable not set" messages
+	setenv("TERM", "xterm-256color", 0);
 
 	while (1) {
 		std::cout << "> " << std::flush;
@@ -29,8 +29,11 @@ int main() {
 		while (ss >> argument)
 			arguments.push_back(argument);
 
+		if (arguments.size() == 0)
+			continue;
 		if (arguments.front() == "exit")
 			return 0;
+
 		bool blocking = arguments.back() != "&";
 		if (arguments.back() == "&")
 			arguments.pop_back();
@@ -54,36 +57,37 @@ int main() {
 		}
 
 		char **c_arguments = new char*[arguments.size() + 1];
-		int i = 0;
+		int arg_len = 0;
 		for (std::vector<std::string>::iterator it = arguments.begin(); it != arguments.end(); ++it) {
 			char *c_argument = new char[it->size() + 1];
 			std::copy(it->begin(), it->end(), c_argument);
 			c_argument[it->size()] = '\0';
-			c_arguments[i++] = c_argument;
+			c_arguments[arg_len++] = c_argument;
 		}
-		c_arguments[i++] = NULL;
+		c_arguments[arg_len++] = NULL;
 
-		if (blocking)
-			signal(SIGCHLD, SIG_DFL);
-		else
-			signal(SIGCHLD, SIG_IGN);
 		// find pid of shell: ps aux | grep shell
 		// find all defunct processes: ps aux | grep Z
-		// find child processes of pid: pstree -p [pid]
-
+		// find child processes of pid: pstree -p -s [pid]
 		pid_t pid = fork();
-		if (pid < 0)
-			std::cerr << "fork() error" << std::endl;
 
+		// handle error
+		if (pid < 0) {
+			std::cerr << "fork() failed" << std::endl;
+			return 1;
+		}
+
+		// child process
 		else if (pid == 0) {
-			// child process
 			if (redirect_in) {
+				// open input file
 				int fin = open(redirect_in_path.c_str(), O_RDONLY);
 				dup2(fin, STDIN_FILENO);
 				close(fin);
 			}
-			// open input file
+
 			if (redirect_out) {
+				// open or create output file in mode 644
 				int fout = open(
 					redirect_out_path.c_str(),
 					O_WRONLY | O_CREAT,
@@ -92,24 +96,35 @@ int main() {
 				dup2(fout, STDOUT_FILENO);
 				close(fout);
 			}
-			// open or create output file in mode 644
-			execvp(c_arguments[0], c_arguments);
-			// the exec family: l for list, v for vector, p for path, e for environment
-			_exit(1);
-			// error occurred
-		}
 
-		else {
 			if (blocking) {
-				int status;
-				waitpid(pid, &status, 0);
-				usleep(100);
-				// workaround for overlapped output
-				if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0))
-					std::cout << "shell: command execution failed: " << command << std::endl;
+				// the exec family: l for list, v for vector, p for path, e for environment
+				execvp(c_arguments[0], c_arguments);
+				// error occurred
+				_exit(1);
 			}
 
-			for (int j = 0; j < i; ++j)
+			else {
+				pid_t pid_inner = fork();
+				if (pid_inner < 0)
+					_exit(1);
+				else if (pid_inner == 0)
+					execvp(c_arguments[0], c_arguments);
+				else
+					_exit(0);
+			}
+		}
+
+		// parent process
+		else {
+			int status;
+			waitpid(pid, &status, 0);
+			// workaround for overlapped output
+			usleep(100);
+			if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0))
+				std::cout << "shell: command execution failed: " << command << std::endl;
+
+			for (int j = 0; j < arg_len; ++j)
 				delete[] c_arguments[j];
 			delete[] c_arguments;
 		}
