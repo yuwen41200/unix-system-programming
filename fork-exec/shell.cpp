@@ -149,7 +149,7 @@ int main() {
 				// open or create output file in mode 644
 				int fout = open(
 					redirect_out_path.c_str(),
-					O_WRONLY | O_CREAT,
+					O_WRONLY | O_TRUNC | O_CREAT,
 					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 				);
 				dup2(fout, STDOUT_FILENO);
