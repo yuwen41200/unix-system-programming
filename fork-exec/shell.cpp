@@ -73,7 +73,7 @@ int main() {
 		}
 
 		// check pipe(|)
-		bool need_pipe = false;
+		bool need_pipe = false, next_cmd_err = false;
 		int next_cmd_idx = -1, fpipe[2];
 
 		if (arguments.front() == "|") {
@@ -94,7 +94,7 @@ int main() {
 		}
 
 		// convert C++ string vector to C char* array
-		char **c_arguments = new char*[arguments.size() + 1];
+		char **c_arguments = new char*[arguments.size() + 1], **c_arguments_next;
 		int arg_len = 0;
 		for (std::vector<std::string>::iterator it = arguments.begin(); it != arguments.end(); ++it) {
 			if (*it == "|") {
@@ -109,6 +109,7 @@ int main() {
 			}
 		}
 		c_arguments[arg_len++] = NULL;
+		c_arguments_next = c_arguments + next_cmd_idx;
 
 		// find pid of shell: ps aux | grep shell
 		// find all defunct processes: ps aux | grep Z
@@ -118,12 +119,18 @@ int main() {
 		// handle error
 		if (pid < 0) {
 			std::cerr << "shell: fork() failed" << std::endl;
+			for (int j = 0; j < arg_len; ++j)
+				delete[] c_arguments[j];
+			delete[] c_arguments;
 			continue;
 		}
 
 		// child process
 		else if (pid == 0) {
 			if (redirect_in) {
+				// check if input file is readable
+				if (access(redirect_in_path.c_str(), R_OK) < 0)
+					_exit(1);
 				// open input file
 				int fin = open(redirect_in_path.c_str(), O_RDONLY);
 				dup2(fin, STDIN_FILENO);
@@ -131,13 +138,14 @@ int main() {
 			}
 
 			if (need_pipe) {
-				// connect output of first command to fpipe[1]
-				dup2(fpipe[1], STDOUT_FILENO);
+				// connect input of the second command to fpipe[0]
+				dup2(fpipe[0], STDIN_FILENO);
 				close(fpipe[0]);
 				close(fpipe[1]);
+				c_arguments = c_arguments_next;
 			}
 
-			else if (redirect_out) {
+			if (redirect_out) {
 				// open or create output file in mode 644
 				int fout = open(
 					redirect_out_path.c_str(),
@@ -156,6 +164,7 @@ int main() {
 			}
 
 			else {
+				// in case of non-blocking, fork grandchild process to prevent defunct processes
 				pid_t pid_inner = fork();
 				if (pid_inner < 0)
 					_exit(1);
@@ -170,13 +179,44 @@ int main() {
 
 		// parent process
 		else {
+			if (need_pipe) {
+				// in case of pipe, fork another child process for the second command
+				pid_t next_cmd_pid = fork();
+
+				if (next_cmd_pid < 0) {
+					std::cerr << "shell: fork() failed" << std::endl;
+					kill(pid, SIGKILL);
+					for (int j = 0; j < arg_len; ++j)
+						delete[] c_arguments[j];
+					delete[] c_arguments;
+					continue;
+				}
+
+				else if (next_cmd_pid == 0) {
+					// connect output of the first command to fpipe[1]
+					dup2(fpipe[1], STDOUT_FILENO);
+					close(fpipe[0]);
+					close(fpipe[1]);
+					execvp(c_arguments[0], c_arguments);
+					_exit(1);
+				}
+
+				else {
+					int next_cmd_status;
+					waitpid(next_cmd_pid, &next_cmd_status, 0);
+					if (!(WIFEXITED(next_cmd_status) && WEXITSTATUS(next_cmd_status) == 0))
+						next_cmd_err = true;
+					close(fpipe[0]);
+					close(fpipe[1]);
+				}
+			}
+
 			int status;
 			waitpid(pid, &status, 0);
 			// workaround for overlapped output
 			usleep(100);
-			if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0))
+			if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0) || next_cmd_err)
 				std::cout << "shell: command execution failed: " << command << std::endl;
-
 			for (int j = 0; j < arg_len; ++j)
 				delete[] c_arguments[j];
 			delete[] c_arguments;
