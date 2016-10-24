@@ -13,6 +13,14 @@
 #include <unistd.h>
 #include <vector>
 
+inline void replace(std::string &str, const std::string &from, const std::string &to) {
+	std::string::size_type pos = 0;
+	while ((pos = str.find(from, pos)) != std::string::npos) {
+		str.replace(pos, from.length(), to);
+		pos += to.length();
+	}
+}
+
 int main() {
 	// prevent "WARNING: terminal is not fully functional"
 	// or "TERM environment variable not set" messages
@@ -23,9 +31,16 @@ int main() {
 		std::cout << "> " << std::flush;
 		std::string command;
 		std::getline(std::cin, command);
-		std::istringstream ss(command);
+		std::string fixed_command = command;
+
+		// workaround for ill-formatted command
+		replace(fixed_command, "&", " & ");
+		replace(fixed_command, "<", " < ");
+		replace(fixed_command, ">", " > ");
+		replace(fixed_command, "|", " | ");
 
 		// tokenize command
+		std::istringstream ss(fixed_command);
 		std::vector<std::string> arguments;
 		std::string argument;
 		while (ss >> argument)
