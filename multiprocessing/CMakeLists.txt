@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.6)
+project(multiprocessing)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic")
+set(SOURCE_FILES main.c)
+add_executable(multiprocessing ${SOURCE_FILES})
