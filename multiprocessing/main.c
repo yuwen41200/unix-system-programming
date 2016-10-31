@@ -14,11 +14,15 @@ int main() {
 		3 * dimension * dimension * sizeof(unsigned),
 		IPC_CREAT | 0600
 	);
+	if (shmid < 0)
+		perror("shmget() error");
 	void *shmaddr = shmat(shmid, NULL, 0);
+	if ((long) shmaddr < 0)
+		perror("shmat() error");
 
 	unsigned *matrix_a = (unsigned *) shmaddr;
-	unsigned *matrix_b = matrix_a + dimension * dimension * sizeof(unsigned);
-	unsigned *matrix_c = matrix_b + dimension * dimension * sizeof(unsigned);
+	unsigned *matrix_b = matrix_a + dimension * dimension;
+	unsigned *matrix_c = matrix_b + dimension * dimension;
 
 	for (unsigned i = 0; i < dimension * dimension; ++i) {
 		matrix_a[i] = i;
@@ -43,6 +47,8 @@ int main() {
 						matrix_c[p * dimension + q] = temp;
 					}
 				}
+
+				_exit(0);
 			}
 		}
 
@@ -55,15 +61,16 @@ int main() {
 
 		gettimeofday(&end_tv, NULL);
 		printf(
-			"Elapsed time: %ld.%06ld sec, Checksum: %u\n",
-			end_tv.tv_sec - begin_tv.tv_sec,
-			end_tv.tv_usec - begin_tv.tv_usec,
-		    checksum
+			"Elapsed time: %.6f sec, Checksum: %u\n",
+			end_tv.tv_sec - begin_tv.tv_sec + (end_tv.tv_usec - begin_tv.tv_usec) / 1000000.0,
+			checksum
 		);
 	}
 
-	shmdt(shmaddr);
-	shmctl(shmid, IPC_RMID, NULL);
+	if (shmdt(shmaddr) < 0)
+		perror("shmdt() error");
+	if (shmctl(shmid, IPC_RMID, NULL) < 0)
+		perror("shmctl() error");
 
 	return 0;
 }
