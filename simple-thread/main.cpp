@@ -1,19 +1,20 @@
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <pthread.h>
 #include <semaphore.h>
+#include <sys/time.h>
 
 int *data;
 sem_t *sems;
+int pivots[11];
 
 void *partition(void *);
 void *sort(void *);
+int compare(const void *, const void *);
 
 int main() {
 	std::string filename;
-	std::cout << "> ";
 	std::cin >> filename;
-
 	std::ifstream input(filename);
 	if (!input.is_open()) {
 		std::cerr << "error: cannot open \"" << filename << "\"" << std::endl;
@@ -38,6 +39,10 @@ int main() {
 	for (int i = 0; i < size; ++i)
 		input >> data[i];
 
+	struct timeval begin, end;
+	std::cout << "multi-thread" << std::endl;
+	gettimeofday(&begin, NULL);
+
 	sems = new sem_t[15];
 	for (int i = 0; i < 15; ++i)
 		sem_init(&sems[i], 0, 0);
@@ -48,11 +53,38 @@ int main() {
 	for (long i = 7; i < 15; ++i)
 		pthread_create(&threads[i], NULL, sort, (void *) i);
 
+	sem_post(&sems[0]);
 	for (int i = 7; i < 15; ++i)
 		sem_wait(&sems[i]);
-
 	delete[] threads;
+
+	for (int i = 0; i < 15; ++i)
+		sem_destroy(&sems[i]);
 	delete[] sems;
+
+	gettimeofday(&end, NULL);
+	double duration = (end.tv_sec - begin.tv_sec) * 1000 + (end.tv_usec - begin.tv_usec) / 1000.0;
+	std::cout << "elapsed " << duration << " ms" << std::endl;
+
+	for (int i = 0; i < size; ++i)
+		output1 << data[i] << " ";
+
+	input.clear();
+	input.seekg(0);
+	for (int i = 0; i < size; ++i)
+		input >> data[i];
+
+	std::cout << "single thread" << std::endl;
+	gettimeofday(&begin, NULL);
+
+	qsort(data, (size_t) size, sizeof(int), compare);
+
+	gettimeofday(&end, NULL);
+	duration = (end.tv_sec - begin.tv_sec) * 1000 + (end.tv_usec - begin.tv_usec) / 1000.0;
+	std::cout << "elapsed " << duration << " ms" << std::endl;
+
+	for (int i = 0; i < size; ++i)
+		output2 << data[i] << " ";
 	delete[] data;
 
 	output2.close();
@@ -60,4 +92,16 @@ int main() {
 	input.close();
 
 	return 0;
+}
+
+void *partition(void *no) {
+	return NULL;
+}
+
+void *sort(void *no) {
+	return NULL;
+}
+
+int compare(const void *a, const void *b) {
+	return *(int *) a - *(int *) b;
 }
