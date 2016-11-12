@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.6)
+project(simple_thread)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra -Wpedantic -pthread")
+set(SOURCE_FILES main.cpp)
+add_executable(simple_thread ${SOURCE_FILES})
