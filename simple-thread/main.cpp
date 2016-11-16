@@ -15,6 +15,7 @@ void *partition(void *);
 void *sort(void *);
 int compare(const void *, const void *);
 inline int part(int, int);
+void bsort(int *, size_t);
 
 int main() {
 	std::string filename;
@@ -83,7 +84,11 @@ int main() {
 	std::cout << "single thread" << std::endl;
 	gettimeofday(&begin, NULL);
 
+	#ifdef PRETTY
 	qsort(data, (size_t) size, sizeof(int), compare);
+	#else
+	bsort(data, (size_t) size);
+	#endif
 
 	gettimeofday(&end, NULL);
 	duration = (end.tv_sec - begin.tv_sec) * 1000 + (end.tv_usec - begin.tv_usec) / 1000.0;
@@ -163,7 +168,11 @@ void *sort(void *no) {
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
 	int nmemb = nol == 7 ? pivots[nol - 7] : nol == 14 ?
 	            size - pivots[nol - 8] - 1 : pivots[nol - 7] - pivots[nol - 8] - 1;
+	#ifdef PRETTY
 	qsort(base, (size_t) nmemb, sizeof(int), compare);
+	#else
+	bsort(base, (size_t) nmemb);
+	#endif
 
 	sem_post(&sems[nol]);
 	return NULL;
@@ -184,4 +193,11 @@ inline int part(int left, int right) {
 		}
 	std::swap(data[right], data[idx]);
 	return idx;
+}
+
+void bsort(int *arr, size_t n) {
+	for (size_t i = 0; i < n - 1; ++i)
+		for (size_t j = 0; j < n - i - 1; ++j)
+			if (arr[j] > arr[j + 1])
+				std::swap(arr[j], arr[j + 1]);
 }
