@@ -7,6 +7,7 @@
 #include <utility>
 #include <deque>
 #include <errno.h>
+#include <time.h>
 
 typedef void (*job)();
 
@@ -35,7 +36,7 @@ void job14();
 
 void *worker(void *);
 inline int part(int, int);
-inline void bsort(int *, size_t);
+inline void bsort(int *, int);
 
 int main() {
 	std::ifstream input("input.txt");
@@ -88,12 +89,14 @@ int main() {
 		jobs.push_back(&job13);
 		jobs.push_back(&job14);
 
+		struct timespec abs_timeout;
 		while (!jobs.empty()) {
 			for (int i = 0; i < pool_size; ++i) {
 				if (jobs.empty())
 					break;
-				sem_trywait(&idle[i]);
-				if (errno == EAGAIN)
+				clock_gettime(CLOCK_REALTIME, &abs_timeout);
+				abs_timeout.tv_sec += 1;
+				if (sem_timedwait(&idle[i], &abs_timeout) < 0)
 					continue;
 				job_table[i] = jobs.front();
 				jobs.pop_front();
@@ -109,7 +112,7 @@ int main() {
 		std::cout << "elapsed " << duration << " ms" << std::endl;
 
 		std::string filename = "output_";
-		filename += pool_size;
+		filename += std::to_string(pool_size);
 		filename += ".txt";
 
 		std::ofstream output(filename, std::ios::out | std::ios::trunc);
@@ -203,7 +206,7 @@ void job7() {
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
 	int nmemb = nol == 7 ? pivots[nol - 7] : nol == 14 ?
 	            size - pivots[nol - 8] - 1 : pivots[nol - 7] - pivots[nol - 8] - 1;
-	bsort(base, (size_t) nmemb);
+	bsort(base, nmemb);
 
 	sem_post(&sems[nol]);
 }
@@ -215,7 +218,7 @@ void job8() {
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
 	int nmemb = nol == 7 ? pivots[nol - 7] : nol == 14 ?
 	            size - pivots[nol - 8] - 1 : pivots[nol - 7] - pivots[nol - 8] - 1;
-	bsort(base, (size_t) nmemb);
+	bsort(base, nmemb);
 
 	sem_post(&sems[nol]);
 }
@@ -227,7 +230,7 @@ void job9() {
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
 	int nmemb = nol == 7 ? pivots[nol - 7] : nol == 14 ?
 	            size - pivots[nol - 8] - 1 : pivots[nol - 7] - pivots[nol - 8] - 1;
-	bsort(base, (size_t) nmemb);
+	bsort(base, nmemb);
 
 	sem_post(&sems[nol]);
 }
@@ -239,7 +242,7 @@ void job10() {
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
 	int nmemb = nol == 7 ? pivots[nol - 7] : nol == 14 ?
 	            size - pivots[nol - 8] - 1 : pivots[nol - 7] - pivots[nol - 8] - 1;
-	bsort(base, (size_t) nmemb);
+	bsort(base, nmemb);
 
 	sem_post(&sems[nol]);
 }
@@ -251,7 +254,7 @@ void job11() {
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
 	int nmemb = nol == 7 ? pivots[nol - 7] : nol == 14 ?
 	            size - pivots[nol - 8] - 1 : pivots[nol - 7] - pivots[nol - 8] - 1;
-	bsort(base, (size_t) nmemb);
+	bsort(base, nmemb);
 
 	sem_post(&sems[nol]);
 }
@@ -263,7 +266,7 @@ void job12() {
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
 	int nmemb = nol == 7 ? pivots[nol - 7] : nol == 14 ?
 	            size - pivots[nol - 8] - 1 : pivots[nol - 7] - pivots[nol - 8] - 1;
-	bsort(base, (size_t) nmemb);
+	bsort(base, nmemb);
 
 	sem_post(&sems[nol]);
 }
@@ -275,7 +278,7 @@ void job13() {
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
 	int nmemb = nol == 7 ? pivots[nol - 7] : nol == 14 ?
 	            size - pivots[nol - 8] - 1 : pivots[nol - 7] - pivots[nol - 8] - 1;
-	bsort(base, (size_t) nmemb);
+	bsort(base, nmemb);
 
 	sem_post(&sems[nol]);
 }
@@ -287,19 +290,18 @@ void job14() {
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
 	int nmemb = nol == 7 ? pivots[nol - 7] : nol == 14 ?
 	            size - pivots[nol - 8] - 1 : pivots[nol - 7] - pivots[nol - 8] - 1;
-	bsort(base, (size_t) nmemb);
+	bsort(base, nmemb);
 
 	sem_post(&sems[nol]);
 }
 
 void *worker(void *no) {
 	long nol = (long) no;
-	sem_wait(&ready[nol]);
-
-	job_table[nol]();
-
-	sem_post(&idle[nol]);
-	return NULL;
+	while (true) {
+		sem_wait(&ready[nol]);
+		job_table[nol]();
+		sem_post(&idle[nol]);
+	}
 }
 
 inline int part(int left, int right) {
@@ -315,9 +317,9 @@ inline int part(int left, int right) {
 	return idx;
 }
 
-inline void bsort(int *arr, size_t n) {
-	for (size_t i = 0; i < n - 1; ++i)
-		for (size_t j = 0; j < n - i - 1; ++j)
+inline void bsort(int *arr, int n) {
+	for (int i = 0; i < n - 1; ++i)
+		for (int j = 0; j < n - i - 1; ++j)
 			if (arr[j] > arr[j + 1])
 				std::swap(arr[j], arr[j + 1]);
 }
