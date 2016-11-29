@@ -6,14 +6,16 @@
 #include <sys/time.h>
 #include <utility>
 #include <deque>
+#include <errno.h>
 
 typedef void (*job)();
 
 int *data;
-sem_t *sems;
+sem_t *sems, *ready, *idle;
 int pivots[7];
 int size;
 std::deque<job> jobs;
+job job_table[8];
 
 void job0();
 void job1();
@@ -22,14 +24,14 @@ void job3();
 void job4();
 void job5();
 void job6();
-void job7(long);
-void job8(long);
-void job9(long);
-void job10(long);
-void job11(long);
-void job12(long);
-void job13(long);
-void job14(long);
+void job7();
+void job8();
+void job9();
+void job10();
+void job11();
+void job12();
+void job13();
+void job14();
 
 void *worker(void *);
 inline int part(int, int);
@@ -50,6 +52,14 @@ int main() {
 	sems = new sem_t[15];
 	for (int i = 0; i < 15; ++i)
 		sem_init(&sems[i], 0, 0);
+
+	ready = new sem_t[8];
+	idle = new sem_t[8];
+	for (int i = 0; i < 8; ++i) {
+		sem_init(&ready[i], 0, 0);
+		sem_init(&idle[i], 0, 0);
+		sem_post(&idle[i]);
+	}
 
 	pthread_t *threads = new pthread_t[8];
 	for (long i = 0; i < 8; ++i) {
@@ -77,6 +87,19 @@ int main() {
 		jobs.push_back(&job12);
 		jobs.push_back(&job13);
 		jobs.push_back(&job14);
+
+		while (!jobs.empty()) {
+			for (int i = 0; i < pool_size; ++i) {
+				if (jobs.empty())
+					break;
+				sem_trywait(&idle[i]);
+				if (errno == EAGAIN)
+					continue;
+				job_table[i] = jobs.front();
+				jobs.pop_front();
+				sem_post(&ready[i]);
+			}
+		}
 
 		for (int i = 7; i < 15; ++i)
 			sem_wait(&sems[i]);
@@ -106,10 +129,17 @@ int main() {
 			input >> data[i];
 	}
 
+	for (int i = 0; i < 8; ++i) {
+		sem_destroy(&ready[i]);
+		sem_destroy(&idle[i]);
+	}
+
 	for (int i = 0; i < 15; ++i)
 		sem_destroy(&sems[i]);
 
 	delete[] threads;
+	delete[] ready;
+	delete[] idle;
 	delete[] sems;
 	delete[] data;
 
@@ -166,7 +196,8 @@ void job6() {
 	sem_post(&sems[6]);
 }
 
-void job7(long nol = 7) {
+void job7() {
+	long nol = 7;
 	sem_wait(&sems[(nol - 1) / 2]);
 
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
@@ -177,7 +208,8 @@ void job7(long nol = 7) {
 	sem_post(&sems[nol]);
 }
 
-void job8(long nol = 8) {
+void job8() {
+	long nol = 8;
 	sem_wait(&sems[(nol - 1) / 2]);
 
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
@@ -188,7 +220,8 @@ void job8(long nol = 8) {
 	sem_post(&sems[nol]);
 }
 
-void job9(long nol = 9) {
+void job9() {
+	long nol = 9;
 	sem_wait(&sems[(nol - 1) / 2]);
 
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
@@ -199,7 +232,8 @@ void job9(long nol = 9) {
 	sem_post(&sems[nol]);
 }
 
-void job10(long nol = 10) {
+void job10() {
+	long nol = 10;
 	sem_wait(&sems[(nol - 1) / 2]);
 
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
@@ -210,7 +244,8 @@ void job10(long nol = 10) {
 	sem_post(&sems[nol]);
 }
 
-void job11(long nol = 11) {
+void job11() {
+	long nol = 11;
 	sem_wait(&sems[(nol - 1) / 2]);
 
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
@@ -221,7 +256,8 @@ void job11(long nol = 11) {
 	sem_post(&sems[nol]);
 }
 
-void job12(long nol = 12) {
+void job12() {
+	long nol = 12;
 	sem_wait(&sems[(nol - 1) / 2]);
 
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
@@ -232,7 +268,8 @@ void job12(long nol = 12) {
 	sem_post(&sems[nol]);
 }
 
-void job13(long nol = 13) {
+void job13() {
+	long nol = 13;
 	sem_wait(&sems[(nol - 1) / 2]);
 
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
@@ -243,7 +280,8 @@ void job13(long nol = 13) {
 	sem_post(&sems[nol]);
 }
 
-void job14(long nol = 14) {
+void job14() {
+	long nol = 14;
 	sem_wait(&sems[(nol - 1) / 2]);
 
 	int *base = nol == 7 ? data : data + pivots[nol - 8] + 1;
@@ -256,7 +294,11 @@ void job14(long nol = 14) {
 
 void *worker(void *no) {
 	long nol = (long) no;
+	sem_wait(&ready[nol]);
 
+	job_table[nol]();
+
+	sem_post(&idle[nol]);
 	return NULL;
 }
 
