@@ -11,17 +11,19 @@ int main(int argc, char** argv) {
 	out.write((char *) &len, sizeof(int));
 
 	char buf[4096];
+	in.read(buf, 4096);
 	while (in.good()) {
-		in.read(buf, 4096);
 		out.write(buf, 4);
+		in.read(buf, 4096);
 	}
 
 	in.clear();
 	in.seekg(0);
 
+	in.read(buf, 4096);
 	while (in.good()) {
-		in.read(buf, 4096);
 		out.write(buf, 4096);
+		in.read(buf, 4096);
 	}
 
 	out.close();

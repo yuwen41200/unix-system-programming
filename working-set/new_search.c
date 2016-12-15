@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 	while (fscanf(testFp, "%4s %d %d\n", key, &start, &end) != EOF)
 		search(data, *len, key, start, end);
 
-	munmap(data, (size_t) dataSt.st_size);
+	munmap(data - sizeof(int), (size_t) dataSt.st_size);
 	printMaxRss();
 
 	fclose(testFp);
