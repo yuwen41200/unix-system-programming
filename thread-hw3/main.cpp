@@ -107,8 +107,8 @@ typedef struct
 
 void task1(void *arg)
 {
-    arg_struct *args = (arg_struct *) arg;
-    int t_no = args->no;
+	arg_struct *args = (arg_struct *) arg;
+	int t_no = args->no;
 	int t_range = args->nw / 8;
 	int t_start = t_no * t_range;
 	int t_end = (t_no == 7) ? args->nw : (t_no + 1) * t_range;
