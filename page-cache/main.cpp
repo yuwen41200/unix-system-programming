@@ -17,6 +17,7 @@ public:
 	Cache(page_count_t total_frame): total_frame(total_frame) {}
 	virtual bool lookup(page_no_t page_no) = 0;
 	virtual void replace(page_no_t page_no) = 0;
+	virtual ~Cache() {}
 };
 
 class Fifo: public Cache {
