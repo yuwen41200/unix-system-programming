@@ -4,7 +4,9 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <string.h>
 #include <iostream>
+#include <iomanip>
 #include <math.h>
 #include <vector>
 #include <string>
@@ -62,7 +64,7 @@ void traverseDir(std::string currPath) {
 
 	while ((de = readdir(dp))) {
 		if (de->d_type == DT_DIR) {
-			if (de->d_name != "." && de->d_name != "..")
+			if (strcmp(de->d_name, ".") && strcmp(de->d_name, ".."))
 				traverseDir(currPath + "/" + de->d_name);
 		}
 		else {
@@ -73,12 +75,13 @@ void traverseDir(std::string currPath) {
 				passed = false;
 			if (filename != "*" && de->d_name != filename)
 				passed = false;
-			if (sizeMin != -1 && st.st_size < sizeMin)
+			if (sizeMin != -1 && st.st_size < sizeMin * std::pow(2.0, 20.0))
 				passed = false;
-			if (sizeMax != -1 && st.st_size > sizeMax)
+			if (sizeMax != -1 && st.st_size > sizeMax * std::pow(2.0, 20.0))
 				passed = false;
 			if (passed) {
 				std::cout << filepath << " " << de->d_ino << " ";
+				std::cout << std::fixed << std::setprecision(6);
 				std::cout << st.st_size / std::pow(2.0, 20.0) << " MB" << std::endl;
 			}
 		}
