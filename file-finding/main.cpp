@@ -71,7 +71,7 @@ void traverseDir(std::string currPath) {
 			bool passed = true;
 			std::string filepath = currPath + "/" + de->d_name;
 			stat(filepath.c_str(), &st);
-			if (inodeNo != -1 && de->d_ino != inodeNo)
+			if (inodeNo != -1 && de->d_ino != (unsigned) inodeNo)
 				passed = false;
 			if (filename != "*" && de->d_name != filename)
 				passed = false;
